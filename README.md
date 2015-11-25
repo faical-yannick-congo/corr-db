@@ -30,3 +30,8 @@ Use:
 
 See the [Docker file](./Dockerfile) for more details.
 
+## Acknowledgment
+
+We would like to acknowledge the tremendous work provided by Dr. Daniel Wheeler
+in forging the initial vision of this initiative. His collaboration and
+contribution to this project have been critical to this point.

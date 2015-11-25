@@ -28,5 +28,5 @@ Use:
 
 ## Installation
 
-See the [Docker file](corr-db/Dockerfile) for more details.
+See the [Docker file](./Dockerfile) for more details.
 

@@ -31,7 +31,6 @@ class ProfileModel(db.Document):
         data['organisation'] = self.organisation
         data['about'] = self.about
         data['extend'] = self.extend
-        data['test'] = 'got you!!'
         return data
 
     def to_json(self):

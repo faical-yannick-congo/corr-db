@@ -1,35 +1,36 @@
 from ..core import db
+from ..models import FileModel
+from ..models import CommentModel
 from ..models import ProjectModel
 from ..models import EnvironmentModel
+from ..models import ApplicationModel
 import datetime
 import json
 from bson import ObjectId
 
 class RecordModel(db.Document):
     project = db.ReferenceField(ProjectModel, reverse_delete_rule=db.CASCADE, required=True)
-    parent = db.ReferenceField(RecordModel, reverse_delete_rule=db.CASCADE)
-    label = db.StringField(max_length=300)
+    application = db.ReferenceField(ApplicationModel)
+    parent = db.StringField(max_length=256)# parent record id #db.ReferenceField(RecordModel, reverse_delete_rule=db.CASCADE)
+    label = db.StringField()
     tags = db.ListField(db.StringField())
     created_at = db.DateTimeField(default=datetime.datetime.utcnow())
     updated_at = db.DateTimeField(default=datetime.datetime.utcnow())
-    system = db.DictField() # {''} add os version, gpu infos, compiler infos.
-    # will not be in the head anymore. And will be called executable instead of program 
-    # Because we will also have experiment. They will all be in body
-    # program = db.DictField() # {'version_control':'git|hg|svn|cvs', 'scope':'local|remote', 'location':'hash|https://remote_version.com/repository_id'}
-    inputs = db.ListField(db.DictField()) # [{}]
-    outputs = db.ListField(db.DictField()) # [{}]
-    dependencies = db.ListField(db.DictField())# [{}]
-    possible_status = ["starting", "started", "paused", "sleeping", "finished", "crashed", "aborded", "resumed", "running", "unknown"]
+    system = db.DictField() # look into providing os version, gpu infos, compiler infos.
+    execution = db.DictField()
+    inputs = db.ListField(db.DictField())
+    outputs = db.ListField(db.DictField())
+    dependencies = db.ListField(db.DictField())
+    possible_status = ["starting", "started", "paused", "sleeping", "finished", "crashed", "terminated", "resumed", "running", "unknown"]
     status = db.StringField(default="unknown", choices=possible_status)
     environment = db.ReferenceField(EnvironmentModel, reverse_delete_rule=db.CASCADE)
     cloned_from = db.StringField(max_length=256)
     possible_access = ["private", "protected", "public"]
     access = db.StringField(default="private", choices=possible_access)
-    resources = db.ListField(db.StringField()) # List of files ids
-    # private = db.BooleanField(default=True)
-    # protected = db.BooleanField(default=True)
+    resources = db.ListField(FileModel) #files ids
     rationels = db.ListField(db.StringField()) #Why did you do this record. What is different from others.
-    comments = db.ListField(db.DictField()) #{"user":str(user_id), "created":str(datetime.datetime.utc()), "title":"", "content":""}
+    comments = db.ListField(CommentModel) #comments ids
+    extend = db.DictField()
 
     def clone(self):
         self.cloned_from = str(self.id)
@@ -57,8 +58,7 @@ class RecordModel(db.Document):
                 else:
                     setattr(self, k, data[k])
                 del data[k]
-        self.save() 
-        # print str(data)       
+        self.save()       
         if data:
             body, created = RecordBodyModel.objects.get_or_create(head=self)
             body.data.update(data)
@@ -89,70 +89,100 @@ class RecordModel(db.Document):
         return updated_strp-created_strp
 
     def info(self):
-        data = {'updated':str(self.updated_at),
+        data = {}
+        data['head'] = {'updated':str(self.updated_at),
          'id': str(self.id), 'project':str(self.project.id), 
          'label': self.label, 'created':str(self.created_at), 'status' : self.status, 'access':self.access}
-        return data
-
-    def to_json(self):
-        data = {}
-        data['head'] = self.info()
-        # data['head']['program'] = self.program
+        data['head']['tags'] = self.tags
+        data['head']['comments'] = len(self.comments)
+        data['head']['resources'] = len(self.resources)
+        data['head']['inputs'] = len(self.inputs)
+        data['head']['outputs'] = len(self.outputs)
+        data['head']['dependencies'] = len(self.dependencies)
+        if self.application != None:
+            data['head']['application'] = str(self.application.id)
+        else:
+            data['head']['application'] = None
+        if self.environment != None:
+            data['head']['environment'] = str(self.environment.id)
+        else:
+            data['head']['environment'] = None
         if self.parent != None:
-            data['head']['parent'] = str(self.parent.id)
+            data['head']['parent'] = self.parent
         else:
             data['head']['parent'] = None
-        data['head']['tags'] = self.tags
+        if self.body != None:
+            data['body'] = str(self.body.id)
+        else:
+            data['body'] = None
+        return data
+
+    def extended(self):
+        data = self.info()
         data['head']['system'] = self.system
+        data['head']['execution'] = self.execution
         data['head']['inputs'] = self.inputs
         data['head']['outputs'] = self.outputs
         data['head']['dependencies'] = self.dependencies
-        data['head']['comments'] = self.comments
-        data['head']['resources'] = self.resources
+        data['head']['comments'] = [comment.extended() for comment in self.comments]
+        data['head']['resources'] = [resource.extended() for resource in self.resources]
         data['head']['rationels'] = self.rationels
-        if self.body:
-            data['body'] = self.body.info()
-        if self.environment:
-            data['environment'] = self.environment.info()
+        data['extend'] = self.extend
+        if self.application != None:
+            data['head']['application'] = self.application.info()
         else:
-            data['environment'] = {}
+            data['head']['application'] = {}
+        if self.environment != None:
+            data['head']['environment'] = self.environment.extended()
+        else:
+            data['head']['environment'] = {}
+        if self.parent != '':
+            data['head']['parent'] = RecordModel.objects.with_id(self.parent).info()
+        else:
+            data['head']['parent'] = {}
+        if self.body != None:
+            data['body'] = self.body.extended()
+        else:
+            data['body'] = {}
+        return data
+
+    def to_json(self):
+        data = self.extended()
         return json.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))
     
     def summary_json(self):
         data = self.info()
-        data['tags'] = len(self.tags)
-        data['inputs'] = len(self.inputs)
-        data['outputs'] = len(self.outputs)
-        data['dependencies'] = len(self.dependencies)
-        data['comments'] = len(self.comments)
-        data['resources'] = len(self.resources)
-        data['rationels'] = len(self.rationels)
-        if self.environment:
-            data["environment"] = True
-        else:
-            data['environment'] = False
+        data['head']['inputs'] = len(self.inputs)
+        data['head']['outputs'] = len(self.outputs)
+        data['head']['dependencies'] = len(self.dependencies)
+        data['head']['comments'] = len(self.comments)
+        data['head']['resources'] = len(self.resources)
+        data['head']['rationels'] = len(self.rationels)
         return json.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))
 
 class RecordBodyModel(db.Document):
     updated_at = db.DateTimeField(default=datetime.datetime.utcnow())
-    head = db.ReferenceField(RecordModel, reverse_delete_rule=db.CASCADE, unique=True)
+    head = db.ReferenceField(RecordModel, reverse_delete_rule=db.CASCADE, unique=True, required=True)
     data = db.DictField()
+    extend = db.DictField()
 
     def info(self):
-        data = {'updated':str(self.updated_at), 'id':str(self.id), 'content':self.data['data']}
+        data = {}
+        data['head'] = str(self.head.id)
+        data['body'] = {'updated':str(self.updated_at), 'id':str(self.id), 'content':self.data['data']}
+        return data
+
+    def extended(self):
+        data = self.info()
+        data['extend'] = self.extend
         return data
 
     def to_json(self):
-        data = {}
-        data['body'] = self.info()
-        data['head'] = json.loads(self.head.info())
+        data = self.extended()
         return json.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))
 
     def summary_json(self):
-        data = {}
-        data['body'] = self.info()
-        data['head'] = json.loads(self.head.summary_json())
-        # print "Data: "+str(data)
+        data = self.info()
         return json.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))
 
 

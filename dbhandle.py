@@ -74,3 +74,4 @@ if __name__ == "__main__":
     handle()
     
 
+# python dbhandle.py --run --dbpath=/home/fyc/Documents/Projects/NIST/CoRR/github/mongo-data/data

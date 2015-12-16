@@ -3,19 +3,20 @@ from ..core import db
 import json
 import hashlib
 
-#Issue with connected_at and datetime in general that makes it not stable in mongodb
-# Here i had to remove the msecondes from connected_at to make it stable from renew to allowance
+# @TODO Issue with connected_at and datetime in general that makes it not stable in mongodb.
+# Here i had to remove the msecondes from connected_at to make it stable from renew to allowance.
 # I know it doesn't make sense. But it does the trick for now.
 # This is a bug that i will have to fix later on for sure.
 
 class UserModel(db.Document):
     created_at = db.DateTimeField(default=datetime.datetime.utcnow())
     connected_at = db.DateTimeField(default=datetime.datetime.utcnow())
-    email = db.StringField(max_length=120, required=True, unique=True)
-    api_token = db.StringField(max_length=256, default=hashlib.sha256(b'CoRRToken_%s'%(str(datetime.datetime.utcnow()))).hexdigest(), unique=True)
-    session = db.StringField(max_length=256, default=hashlib.sha256(b'CoRRSession_%s'%(str(datetime.datetime.utcnow()))).hexdigest(), unique=True)
-    possible_group = ["admin", "user", "developer", "unknown"]
-    group = db.StringField(default="user", choices=possible_group)
+    email = db.StringField(required=True, unique=True)
+    api_token = db.StringField(max_length=256, unique=True)
+    session = db.StringField(max_length=256, unique=True)
+    possible_group = ["admin", "user", "developer", "public", "unknown"]
+    group = db.StringField(default="unknown", choices=possible_group)
+    extend = db.DictField()
 
     def __repr__(self):
         return '<User %r>' % (self.email)
@@ -35,9 +36,18 @@ class UserModel(db.Document):
         except NameError:
             return str(self.id)  # python 3
 
+    def save(self, *args, **kwargs):
+        if not self.api_token:
+            self.api_token = hashlib.sha256(b'CoRRToken_%s'%(str(datetime.datetime.utcnow()))).hexdigest()
+
+        if not self.session:
+            self.session = hashlib.sha256(b'CoRRSession_%s'%(str(datetime.datetime.utcnow()))).hexdigest()
+
+        return super(UserModel, self).save(*args, **kwargs)
+
     def renew(self, unic):
-        # self.connected_at = datetime.datetime.utcnow()
-        self.session = hashlib.sha256(b'CoRRSession_%s_%s_%s'%(self.email, str(self.connected_at).split('.')[0], unic)).hexdigest()
+        self.connected_at = datetime.datetime.utcnow()
+        self.session = hashlib.sha256(b'CoRRSession_%s_%s_%s'%(self.email, str(self.connected_at), unic)).hexdigest()
         self.save()
 
     def retoken(self):
@@ -47,12 +57,24 @@ class UserModel(db.Document):
     def allowed(self, unic):
         return hashlib.sha256(b'CoRRSession_%s_%s_%s'%(self.email, str(self.connected_at).split('.')[0], unic)).hexdigest()
 
+    def info(self):
+        data = {'created':str(self.created_at), 'id': str(self.id), 'email' : self.email, 'group':self.group, 'total_projects' : len(self.projects), 'total_duration':self.duration, 'total_records':self.record_count}
+        return data
+
+    def extended(self):
+        data = self.info()
+        data['apiToken'] = self.api_token
+        data['session'] = self.session
+        data['extend'] = self.extend
+        return data
+
     def to_json(self):
-        return json.dumps({'created':str(self.created_at), 'id': str(self.id), 'email' : self.email, 'group':self.group, 'total_projects' : len(self.projects), 'total_duration':self.duration, 'total_records':self.record_count}, sort_keys=True, indent=4, separators=(',', ': '))
+        data = self.extended()
+        return json.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))
 
     def activity_json(self, admin=False):
         projects_summary = [json.loads(p.summary_json()) for p in self.projects if not p.private or admin]
-        return json.dumps({'user':json.loads(self.to_json()), 'projects' : projects_summary}, sort_keys=True, indent=4, separators=(',', ': '))
+        return json.dumps({'user':self.extended(), 'projects' : projects_summary}, sort_keys=True, indent=4, separators=(',', ': '))
 
     @property
     def projects(self):

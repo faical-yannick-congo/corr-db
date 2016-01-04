@@ -12,8 +12,16 @@ class MessageModel(db.Document):
     receiver = db.ReferenceField(UserModel, required=True)
     title = db.StringField()
     content = db.StringField()
-    attachments = db.ListField(FileModel) #files ids
+    attachments = db.ListField(db.StringField()) #files ids
     extend = db.DictField()
+
+    def _attachments(self):
+        attachments = []
+        for f_id in self.attachments:
+            f = FileModel.objects.with_id(f_id)
+            if f != None:
+                attachments.append(f)
+        return attachments
 
     def clone(self):
         del self.__dict__['_id']
@@ -30,7 +38,7 @@ class MessageModel(db.Document):
     def extended(self):
         data = self.info()
         data['content'] = self.content
-        data['attachments'] = [attachment.extended() for attachment in self.attachments]
+        data['attachments'] = [attachment.extended() for attachment in self._attachments()]
         data['extend'] = self.extend
         return data
 

@@ -18,18 +18,19 @@ class RecordModel(db.Document):
     updated_at = db.DateTimeField(default=datetime.datetime.utcnow())
     system = db.DictField() # look into providing os version, gpu infos, compiler infos.
     execution = db.DictField()
+    preparation = db.DictField() # What are the steps to get this ready to be recorded.
     inputs = db.ListField(db.DictField())
     outputs = db.ListField(db.DictField())
-    dependencies = db.ListField(db.DictField())
+    dependencies = db.ListField(db.DictField()) # check for c++ libs here. {'type':lib|compiler|interpretor|language|software|prorietary}
     possible_status = ["starting", "started", "paused", "sleeping", "finished", "crashed", "terminated", "resumed", "running", "unknown"]
     status = db.StringField(default="unknown", choices=possible_status)
     environment = db.ReferenceField(EnvironmentModel, reverse_delete_rule=db.CASCADE)
     cloned_from = db.StringField(max_length=256)
     possible_access = ["private", "protected", "public"]
     access = db.StringField(default="private", choices=possible_access)
-    resources = db.ListField(FileModel) #files ids
+    resources = db.ListField(db.StringField()) #files ids
     rationels = db.ListField(db.StringField()) #Why did you do this record. What is different from others.
-    comments = db.ListField(CommentModel) #comments ids
+    comments = db.ListField(db.StringField()) #comments ids
     extend = db.DictField()
 
     def clone(self):
@@ -64,10 +65,10 @@ class RecordModel(db.Document):
             body.data.update(data)
             body.save()
 
-    @property
-    def files(self):
-        from ..models import FileModel
-        return FileModel.objects(record=self).order_by('+created_at')
+    # @property
+    # def files(self):
+    #     from ..models import FileModel
+    #     return FileModel.objects(record=self).order_by('+created_at')
 
     @property
     def body(self):
@@ -75,17 +76,19 @@ class RecordModel(db.Document):
 
     @property
     def duration(self):
-        try:
-            updated_strp = datetime.datetime.strptime(str(self.updated_at), '%Y-%m-%d %H:%M:%S.%f')
-        except:
-            updated_strp = datetime.datetime.strptime(str(self.updated_at), '%Y-%m-%d %H:%M:%S')
+        updated_strp = datetime.datetime.strptime(str(self.updated_at), '%Y-%m-%d %H:%M:%S.%f')
+        created_strp = datetime.datetime.strptime(str(self.created_at), '%Y-%m-%d %H:%M:%S.%f')
+        # try:
+        #     updated_strp = datetime.datetime.strptime(str(self.updated_at), '%Y-%m-%d %H:%M:%S.%f')
+        # except:
+        #     updated_strp = datetime.datetime.strptime(str(self.updated_at), '%Y-%m-%d %H:%M:%S')
 
-        try:
-            created_strp = datetime.datetime.strptime(str(self.created_at), '%Y-%m-%d %H:%M:%S.%f')
-        except:
-            created_strp = datetime.datetime.strptime(str(self.created_at), '%Y-%m-%d %H:%M:%S')
+        # try:
+        #     created_strp = datetime.datetime.strptime(str(self.created_at), '%Y-%m-%d %H:%M:%S.%f')
+        # except:
+        #     created_strp = datetime.datetime.strptime(str(self.created_at), '%Y-%m-%d %H:%M:%S')
 
-        print str(updated_strp-created_strp)
+        # print str(updated_strp-created_strp)
         return updated_strp-created_strp
 
     def info(self):
@@ -117,15 +120,32 @@ class RecordModel(db.Document):
             data['body'] = None
         return data
 
+    def _comments(self):
+        comments = []
+        for com_id in self.comments:
+            com = CommentModel.objects.with_id(com_id)
+            if com != None:
+                comments.append(com)
+        return comments
+
+    def _resources(self):
+        resources = []
+        for f_id in self.resources:
+            f = FileModel.objects.with_id(f_id)
+            if f != None:
+                resources.append(f)
+        return resources
+
     def extended(self):
         data = self.info()
         data['head']['system'] = self.system
         data['head']['execution'] = self.execution
+        data['head']['preparation'] = self.preparation
         data['head']['inputs'] = self.inputs
         data['head']['outputs'] = self.outputs
         data['head']['dependencies'] = self.dependencies
-        data['head']['comments'] = [comment.extended() for comment in self.comments]
-        data['head']['resources'] = [resource.extended() for resource in self.resources]
+        data['head']['comments'] = [comment.extended() for comment in self._comments()]
+        data['head']['resources'] = [resource.extended() for resource in self._resources()]
         data['head']['rationels'] = self.rationels
         data['extend'] = self.extend
         if self.application != None:
@@ -169,7 +189,7 @@ class RecordBodyModel(db.Document):
     def info(self):
         data = {}
         data['head'] = str(self.head.id)
-        data['body'] = {'updated':str(self.updated_at), 'id':str(self.id), 'content':self.data['data']}
+        data['body'] = {'updated':str(self.updated_at), 'id':str(self.id), 'content':self.data}
         return data
 
     def extended(self):

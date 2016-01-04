@@ -20,9 +20,25 @@ class EnvironmentModel(db.Document):
     specifics = db.DictField() 
     version = db.ReferenceField(VersionModel)
     bundle = db.ReferenceField(BundleModel)
-    comments = db.ListField(CommentModel) #comments ids
-    resources = db.ListField(FileModel) #files ids
+    comments = db.ListField(db.StringField()) #comments ids
+    resources = db.ListField(db.StringField()) #files ids
     extend = db.DictField()
+
+    def _comments(self):
+        comments = []
+        for com_id in self.comments:
+            com = CommentModel.objects.with_id(com_id)
+            if com != None:
+                comments.append(com)
+        return comments
+
+    def _resources(self):
+        resources = []
+        for f_id in self.resources:
+            f = FileModel.objects.with_id(f_id)
+            if f != None:
+                resources.append(f)
+        return resources
 
     def clone(self):
         del self.__dict__['_id']
@@ -50,8 +66,8 @@ class EnvironmentModel(db.Document):
 
     def extended(self):
         data = self.info()
-        data['comments'] = [comment.extended() for comment in self.comments]
-        data['resources'] = [resource.extended() for resource in self.resources]
+        data['comments'] = [comment.extended() for comment in self._comments()]
+        data['resources'] = [resource.extended() for resource in self._resources()]
         data['extend'] = self.extend
         if self.version != None:
             data['version'] = self.version.extended()

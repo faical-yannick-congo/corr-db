@@ -41,16 +41,17 @@ class AccessModel(db.Document):
     def application_access(application=None):
         data = {}
         if application != None:
-            data = {'total':len(AccessModel.object(application=application)), 'access':[]}
-            data['access'] = AccessModel.object(application=application).order_by('-created_at')
+            data = {'total':len(AccessModel.objects(application=application))}
+            data['access'] = [acc.info() for acc in AccessModel.objects(application=application).order_by('-created_at')]
+            return data
         return data
     
     @staticmethod
     def activity_json():
         data = {}
-        data['api'] = {'total':len(AccessModel.object(scope='api')), 'endpoints':[]}
-        data['api']['endpoints'] = AccessModel.object(scope='api').order_by('-endpoint')
-        data['cloud'] = {'total':len(AccessModel.object(scope='cloud')), 'endpoints':[]}
-        data['cloud']['endpoints'] = AccessModel.object(scope='cloud').order_by('-endpoint')
+        data['api'] = {'total':len(AccessModel.objects(scope='api')), 'endpoints':[]}
+        data['api']['endpoints'] = AccessModel.objects(scope='api').order_by('-endpoint')
+        data['cloud'] = {'total':len(AccessModel.objects(scope='cloud')), 'endpoints':[]}
+        data['cloud']['endpoints'] = AccessModel.objects(scope='cloud').order_by('-endpoint')
         
         return json.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))

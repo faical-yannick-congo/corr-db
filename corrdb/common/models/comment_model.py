@@ -12,9 +12,25 @@ class CommentModel(db.Document):
     resource = db.ReferenceField(FileModel, reverse_delete_rule=db.CASCADE)
     title = db.StringField()
     content = db.StringField()
-    attachments = db.ListField(FileModel) #files ids
-    useful = db.ListField(UserModel)      #users ids
+    attachments = db.ListField(db.StringField()) #files ids
+    useful = db.ListField(db.StringField())      #users ids
     extend = db.DictField()
+
+    def _useful(self):
+        useful = []
+        for u_id in self.useful:
+            u = UserModel.objects.with_id(u_id)
+            if u != None:
+                useful.append(u)
+        return useful
+
+    def _attachments(self):
+        attachments = []
+        for f_id in self.attachments:
+            f = FileModel.objects.with_id(f_id)
+            if f != None:
+                attachments.append(f)
+        return attachments
 
     def clone(self):
         del self.__dict__['_id']
@@ -25,24 +41,24 @@ class CommentModel(db.Document):
     def info(self):
         data = {'created':str(self.created_at), 'id': str(self.id), 'sender':str(self.sender.id), 'title':self.title,
         'content':self.content}
-        if resource != None:
-            data['resource'] = str(resource.id)
+        if self.resource != None:
+            data['resource'] = str(self.resource.id)
         data['useful'] = len(self.useful)
         data['attachments'] = len(self.attachments)
         return data
 
     def extended(self):
         data = self.info()
-        if resource != None:
-            data['resource'] = resource.extended()
+        if self.resource != None:
+            data['resource'] = self.resource.extended()
         data['useful'] = []
-        for us in useful:
+        for us in self._useful():
             us_profile = ProfileModel.objects(user=us).first()
             if us_profile == None:
                 data['useful'].append({'email_only':us.email})
             else:
                 data['useful'].append(us_profile.info())
-        data['attachments'] = [attachment.extended() for attachment in self.attachments]
+        data['attachments'] = [attachment.extended() for attachment in self._attachments()]
         data['extend'] = self.extend
         return data
 

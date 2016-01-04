@@ -16,13 +16,29 @@ class DiffModel(db.Document):
     record_to = db.ReferenceField(RecordModel, reverse_delete_rule=db.CASCADE, required=True)
     possible_method = ["default", "visual", "custom", "undefined"]
     method = db.StringField(default="undefined", choices=possible_method)
-    resources = db.ListField(FileModel) #files ids
+    resources = db.ListField(db.StringField()) #files ids
     possible_proposition = ["repeated", "reproduced", "replicated", "non-replicated", "non-repeated", "non-reproduced", "undefined"]
     proposition = db.StringField(default="undefined", choices=possible_proposition)
     possible_status = ["proposed", "agreed", "denied", "undefined", "altered"]
     status = db.StringField(default="undefined", choices=possible_status)
-    comments = db.ListField(CommentModel) #comments ids
+    comments = db.ListField(db.StringField()) #comments ids
     extend = db.DictField()
+
+    def _comments(self):
+        comments = []
+        for com_id in self.comments:
+            com = CommentModel.objects.with_id(com_id)
+            if com != None:
+                comments.append(com)
+        return comments
+
+    def _resources(self):
+        resources = []
+        for f_id in self.resources:
+            f = FileModel.objects.with_id(f_id)
+            if f != None:
+                resources.append(f)
+        return resources
 
     def clone(self):
         del self.__dict__['_id']
@@ -52,8 +68,8 @@ class DiffModel(db.Document):
             data['targeted'] = self.targeted.email
         else:
             data['targeted'] = targeted_profile.extended()
-        data['resources'] = [resource.extended() for resource in self.resources]
-        data['comments'] = [comment.extended() for comment in self.comments]
+        data['resources'] = [resource.extended() for resource in self._resources()]
+        data['comments'] = [comment.extended() for comment in self._comments()]
         data['extend'] = self.extend
         return data
 

@@ -11,6 +11,7 @@ from bson import ObjectId
 class ProjectModel(db.Document):
     created_at = db.DateTimeField(default=datetime.datetime.utcnow())
     application = db.ReferenceField(ApplicationModel)
+    logo = db.ReferenceField(FileModel)
     owner = db.ReferenceField(UserModel, reverse_delete_rule=db.CASCADE, required=True)
     name = db.StringField(required=True)
     description = db.StringField()
@@ -18,14 +19,38 @@ class ProjectModel(db.Document):
     tags = db.ListField(db.StringField())
     possible_access = ["private", "protected", "public"]
     access = db.StringField(default="private", choices=possible_access)
-    history = db.ListField(EnvironmentModel)
+    history = db.ListField(db.StringField())
     cloned_from = db.StringField(max_length=256)
-    resources = db.ListField(FileModel) #files ids
+    resources = db.ListField(db.StringField()) #files ids
     possible_group = ["computational", "experimental", "hybrid", "undefined"]
     group = db.StringField(default="undefined", choices=possible_group)
-    comments = db.ListField(CommentModel) #comments ids
+    comments = db.ListField(db.StringField()) #comments ids
     # TOREPLACE BY comments = db.ListField(db.StringField()) #comments ids
     extend = db.DictField()
+
+    def _history(self):
+        history = []
+        for env_id in self.history:
+            env = EnvironmentModel.objects.with_id(env_id)
+            if env != None:
+                history.append(env)
+        return history
+
+    def _comments(self):
+        comments = []
+        for com_id in self.comments:
+            com = CommentModel.objects.with_id(com_id)
+            if com != None:
+                comments.append(com)
+        return comments
+
+    def _resources(self):
+        resources = []
+        for f_id in self.resources:
+            f = FileModel.objects.with_id(f_id)
+            if f != None:
+                resources.append(f)
+        return resources
 
     def clone(self):
         self.cloned_from = str(self.id)
@@ -43,16 +68,24 @@ class ProjectModel(db.Document):
             data['application'] = str(self.application.id)
         else:
             data['application'] = None
+        if self.logo != None:
+            data['logo'] = str(self.logo.id)
+        else:
+            data['logo'] = ''
         return data
 
     def extended(self):
         data = self.info()
+        if self.application != None:
+            data['application'] = self.application.info()
+        else:
+            data['application'] = {}
         data['tags'] = self.tags
         data['goals'] = self.goals
-        data['history'] = [env.extended() for env in self.history]
+        data['history'] = [env.extended() for env in self._history()]
         data['description'] = self.description
-        data['comments'] = [comment.extended() for comment in self.comments]
-        data['resources'] = [resource.extended() for resource in self.resources]
+        data['comments'] = [comment.extended() for comment in self._comments()]
+        data['resources'] = [resource.extended() for resource in self._resources()]
         data['extend'] = self.extend
         return data
 
@@ -87,6 +120,13 @@ class ProjectModel(db.Document):
             else:
                 return json.dumps({}, sort_keys=True, indent=4, separators=(',', ': '))
 
+
+    def compress(self):
+        data = self.extended()
+        data['records'] = [record.extended() for record in self.records]
+        data['diffs'] = [diff.extended() for diff in self.diffs]
+        return data
+
     @property
     def record_count(self):
         return self.records.count()
@@ -101,6 +141,18 @@ class ProjectModel(db.Document):
             if diff.record_to.project == self:
                 diffs.append(diff)
         return len(diffs)
+
+    @property
+    def diffs(self):
+        from ..models import DiffModel
+        diffs = []
+        for diff in DiffModel.objects():
+            if diff.record_from.project == self:
+                diffs.append(diff)
+            if diff.record_to.project == self:
+                diffs.append(diff)
+        return diffs
+
     @property
     def records(self):
         from ..models import RecordModel
@@ -118,15 +170,17 @@ class ProjectModel(db.Document):
         if self.records == None or len(self.records) == 0:
             return 0
         else:
-            try:
-                last_updated_strp = datetime.datetime.strptime(str(self.last_updated), '%Y-%m-%d %H:%M:%S.%f')
-            except:
-                last_updated_strp = datetime.datetime.strptime(str(self.last_updated), '%Y-%m-%d %H:%M:%S')
+            last_updated_strp = datetime.datetime.strptime(str(self.last_updated), '%Y-%m-%d %H:%M:%S.%f')
+            created_strp = datetime.datetime.strptime(str(self.created_at), '%Y-%m-%d %H:%M:%S.%f')
+            # try:
+            #     last_updated_strp = datetime.datetime.strptime(str(self.last_updated), '%Y-%m-%d %H:%M:%S.%f')
+            # except:
+            #     last_updated_strp = datetime.datetime.strptime(str(self.last_updated), '%Y-%m-%d %H:%M:%S')
 
-            try:
-                created_strp = datetime.datetime.strptime(str(self.created_at), '%Y-%m-%d %H:%M:%S.%f')
-            except:
-                created_strp = datetime.datetime.strptime(str(self.created_at), '%Y-%m-%d %H:%M:%S')
+            # try:
+            #     created_strp = datetime.datetime.strptime(str(self.created_at), '%Y-%m-%d %H:%M:%S.%f')
+            # except:
+            #     created_strp = datetime.datetime.strptime(str(self.created_at), '%Y-%m-%d %H:%M:%S')
 
-            print str(last_updated_strp-created_strp)
+            # print "Duration: %s"%str(last_updated_strp-created_strp)
             return last_updated_strp-created_strp

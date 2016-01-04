@@ -16,12 +16,28 @@ class ApplicationModel(db.Document):
     possible_access = ["activated", "blocked", "deactivated"]
     access = db.StringField(default="deactivated", choices=possible_access)
     app_token = db.StringField(max_length=256, unique=True)
-    users = db.ListField(UserModel, default=[]) #users ids
-    resources = db.ListField(FileModel)
+    users = db.ListField(db.StringField()) #users ids
+    resources = db.ListField(db.StringField())
     storage = db.LongField()
     network = db.StringField(default="0.0.0.0")
     visibile = db.BooleanField(default=False)
     extend = db.DictField()
+
+    def _users(self):
+        users = []
+        for u_id in self.users:
+            u = UserModel.objects.with_id(u_id)
+            if u != None:
+                users.append(u)
+        return users
+
+    def _resources(self):
+        resources = []
+        for f_id in self.resources:
+            f = FileModel.objects.with_id(f_id)
+            if f != None:
+                resources.append(f)
+        return resources
 
     def save(self, *args, **kwargs):
         if not self.app_token:
@@ -51,10 +67,10 @@ class ApplicationModel(db.Document):
 
     def extended(self):
         data = self.info()
-        data['resources'] = [resource.extended() for resource in self.resources]
+        data['resources'] = [resource.extended() for resource in self._resources()]
         data['extend'] = self.extend
         data['token'] = self.app_token
-        data['users'] = self.users
+        data['users'] = self._users()
         data['storage'] = self.storage
         return data
 

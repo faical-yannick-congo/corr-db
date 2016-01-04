@@ -68,6 +68,18 @@ class UserModel(db.Document):
         data['extend'] = self.extend
         return data
 
+    def home(self):
+        from ..models import ProfileModel
+        data = {}
+        data['account'] = self.extended()
+        data['profile'] = ProfileModel.objects(user=self).first().extended()
+        data['activity'] = {}
+        data['activity']['quota'] = self.quota
+        data['activity']['apps'] = {'size':len(self.apps), 'list':[app.info() for app in self.apps]}
+        data['activity']['statistics'] = {'size_project':len(self.projects), 'size_records':len(self.records), 'duration':self.duration}
+        return data
+
+
     def to_json(self):
         data = self.extended()
         return json.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))
@@ -82,10 +94,15 @@ class UserModel(db.Document):
         return ProjectModel.objects(owner=self)
 
     @property
+    def apps(self):
+        from ..models import ApplicationModel
+        return [p.application for p in self.projects]
+
+    @property
     def records(self):
         records = []
         for project in self.projects:
-            records += project.records
+            records.extend(project.records)
         return records
 
     @property
@@ -93,14 +110,59 @@ class UserModel(db.Document):
         #Add the filemodel to the quota check.
         from ..models import FileModel
         from ..models import EnvironmentModel
+        from ..models import CommentModel
         occupation = 0
         for project in self.projects:
             for env in project.history:
                 environment = EnvironmentModel.objects.with_id(env)
-                occupation += environment.bundle['size']
-            for record in project.records:
-                for _file in FileModel.objects(record=record):
-                    occupation += _file.size 
+                if environment != None and environment.bundle != None:
+                    try:
+                        occupation = occupation + environment.bundle.size
+                    except:
+                        pass
+            for file_id in project.resources:
+                _file = FileModel.objects.with_id(file_id)
+                if _file != None:
+                    try:
+                        occupation = occupation + _file.size
+                    except:
+                        pass
+            for file_id in project.resources:
+                _file = FileModel.objects.with_id(file_id)
+                if _file != None:
+                    try:
+                        occupation = occupation + _file.size
+                    except:
+                        pass
+            for comment_id in project.comments:
+                _comment = CommentModel.objects.with_id(comment_id)
+                if _comment != None:
+                    for file_id in _comment.attachments:
+                        _file = FileModel.objects.with_id(file_id)
+                        if _file != None:
+                            try:
+                                occupation = occupation + _file.size
+                            except:
+                                pass
+            for record in self.records:
+                for file_id in record.resources:
+                    _file = FileModel.objects.with_id(file_id)
+                    if _file != None:
+                        try:
+                            occupation = occupation + _file.size
+                        except:
+                            pass
+                for comment_id in record.comments:
+                    _comment = CommentModel.objects.with_id(comment_id)
+                    if _comment != None:
+                        for file_id in _comment.attachments:
+                            _file = FileModel.objects.with_id(file_id)
+                            if _file != None:
+                                try:
+                                    occupation = occupation + _file.size
+                                except:
+                                    pass
+
         return occupation
     
     @property
@@ -109,10 +171,13 @@ class UserModel(db.Document):
 
     @property
     def duration(self):
-        try:
-            return sum([p.duration for p in self.projects])
-        except:
-            return 0.0
+        d = 0
+        for p in self.projects:
+            try:
+                d += p.duration.total_seconds()
+            except:
+                d = d + p.duration
+        return str(datetime.timedelta(seconds=d))
 
 
             

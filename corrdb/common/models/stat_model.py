@@ -4,7 +4,7 @@ import json
 from bson import ObjectId
 
 class StatModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     # Shape the display for: 10 for years. to have a 10 year view. 
     # 12 for monthly to have a yearly view and 7 for a week view.
     interval = db.StringField(required=True) # "2015_01-2015_12", "2015_08_1-2015_08_31", "2015_08_14_0_0_0-2015_08_14_23_59_59"

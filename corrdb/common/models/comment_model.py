@@ -7,7 +7,7 @@ from ..models import UserModel
 from ..models import FileModel
           
 class CommentModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     sender = db.ReferenceField(UserModel, required=True)
     resource = db.ReferenceField(FileModel, reverse_delete_rule=db.CASCADE)
     title = db.StringField()

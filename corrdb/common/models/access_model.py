@@ -5,7 +5,7 @@ import hashlib
 from ..models import ApplicationModel
 
 class AccessModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow()) #datetime.datetime.now())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow())) #datetime.datetime.now())
     application = db.ReferenceField(ApplicationModel)
     possible_scope = ["api", "cloud", "root"]
     scope = db.StringField(default="root", choices=possible_scope)

@@ -9,7 +9,7 @@ import json
 from bson import ObjectId
 
 class DiffModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     sender = db.ReferenceField(UserModel, required=True)
     targeted = db.ReferenceField(UserModel, required=True)
     record_from = db.ReferenceField(RecordModel, reverse_delete_rule=db.CASCADE, required=True)

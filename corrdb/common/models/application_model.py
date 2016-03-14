@@ -8,7 +8,7 @@ from ..models import FileModel
 import hashlib
           
 class ApplicationModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     developer = db.ReferenceField(UserModel, required=True)
     name = db.StringField(required=True, unique=True)
     about = db.StringField()

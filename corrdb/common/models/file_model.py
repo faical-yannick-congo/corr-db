@@ -5,7 +5,7 @@ from bson import ObjectId
 from ..models import UserModel
 
 class FileModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     owner = db.ReferenceField(UserModel, reverse_delete_rule=db.CASCADE)
     encoding = db.StringField()
     mimetype = db.StringField()

@@ -14,8 +14,8 @@ class RecordModel(db.Document):
     parent = db.StringField(max_length=256)# parent record id #db.ReferenceField(RecordModel, reverse_delete_rule=db.CASCADE)
     label = db.StringField()
     tags = db.ListField(db.StringField())
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
-    updated_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
+    updated_at = db.StringField(default=str(datetime.datetime.utcnow()))
     system = db.DictField() # look into providing os version, gpu infos, compiler infos.
     execution = db.DictField()
     preparation = db.DictField() # What are the steps to get this ready to be recorded.
@@ -181,7 +181,7 @@ class RecordModel(db.Document):
         return json.dumps(data, sort_keys=True, indent=4, separators=(',', ': '))
 
 class RecordBodyModel(db.Document):
-    updated_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    updated_at = db.StringField(default=str(datetime.datetime.utcnow()))
     head = db.ReferenceField(RecordModel, reverse_delete_rule=db.CASCADE, unique=True, required=True)
     data = db.DictField()
     extend = db.DictField()

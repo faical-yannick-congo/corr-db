@@ -8,7 +8,7 @@ from ..models import CommentModel
 from ..models import FileModel
           
 class EnvironmentModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     possible_group = ["computational", "experimental", "hybrid", "unknown"]
     group = db.StringField(default="unknown", choices=possible_group)
     possible_system = ["container-based", "vm-based", "tool-based", "cloud-based", "device-based", "lab-based", "custom-based", "undefined"]

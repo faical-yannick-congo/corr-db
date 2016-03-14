@@ -4,7 +4,7 @@ import json
 from bson import ObjectId
           
 class VersionModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     possible_system = ["git", "mercurial", "subversion", "cvs", "bazaar", "arch", "monotone", "aegis", "fastcst", "opencm", "vesta", "codeville", "darcs", "bitkeeper", "perforce", "clearcase" , "unknown"]
     system = db.StringField(default="unknown", choices=possible_system)
     baseline = db.StringField()

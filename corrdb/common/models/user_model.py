@@ -2,6 +2,7 @@ import datetime
 from ..core import db
 import json
 import hashlib
+import time
 
 # @TODO Issue with connected_at and datetime in general that makes it not stable in mongodb.
 # Here i had to remove the msecondes from connected_at to make it stable from renew to allowance.
@@ -9,8 +10,8 @@ import hashlib
 # This is a bug that i will have to fix later on for sure.
 
 class UserModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
-    connected_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
+    connected_at = db.StringField(default=str(datetime.datetime.utcnow()))
     email = db.StringField(required=True, unique=True)
     api_token = db.StringField(max_length=256, unique=True)
     session = db.StringField(max_length=256, unique=True)
@@ -37,6 +38,12 @@ class UserModel(db.Document):
             return str(self.id)  # python 3
 
     def save(self, *args, **kwargs):
+        if not self.created_at:
+            self.created_at = str(datetime.datetime.utcnow())
+
+        if not self.connected_at:
+            self.connected_at = str(datetime.datetime.utcnow())
+
         if not self.api_token:
             self.api_token = hashlib.sha256(b'CoRRToken_%s'%(str(datetime.datetime.utcnow()))).hexdigest()
 
@@ -45,17 +52,32 @@ class UserModel(db.Document):
 
         return super(UserModel, self).save(*args, **kwargs)
 
-    def renew(self, unic):
-        self.connected_at = datetime.datetime.utcnow()
-        self.session = hashlib.sha256(b'CoRRSession_%s_%s_%s'%(self.email, str(self.connected_at), unic)).hexdigest()
+    def sess_sync(self, unic):
+        self.session = str(hashlib.sha256(b'CoRRSession_%s_%s_%s'%(self.email, str(self.connected_at), unic)).hexdigest())
         self.save()
+
+    def renew(self, unic):
+        # print "renew unic: %s"%unic
+        print "connected_at: %s"%str(self.connected_at)
+        self.connected_at = str(datetime.datetime.utcnow())
+        print "connected_at: %s"%str(self.connected_at)
+        print "session: %s"%str(self.session)
+        self.session = str(hashlib.sha256(b'CoRRSession_%s_%s_%s'%(self.email, str(self.connected_at), unic)).hexdigest())
+        self.save()
+        print "connected_at: %s"%str(self.connected_at)
+        print "session: %s"%str(self.session)
 
     def retoken(self):
         self.api_token = hashlib.sha256(b'CoRRToken_%s_%s'%(self.email, str(datetime.datetime.utcnow()))).hexdigest()
         self.save()
 
     def allowed(self, unic):
-        return hashlib.sha256(b'CoRRSession_%s_%s_%s'%(self.email, str(self.connected_at).split('.')[0], unic)).hexdigest()
+        # print "allowed unic: %s"%unic
+        print "connected_at: %s"%str(self.connected_at)
+        print "session: %s"%str(self.session)
+        allowed = hashlib.sha256(b'CoRRSession_%s_%s_%s'%(self.email, str(self.connected_at), unic)).hexdigest()
+        print "allowed: %s"%str(allowed)
+        return str(allowed)
 
     def info(self):
         data = {'created':str(self.created_at), 'id': str(self.id), 'email' : self.email, 'group':self.group, 'total_projects' : len(self.projects), 'total_duration':self.duration, 'total_records':self.record_count}

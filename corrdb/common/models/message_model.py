@@ -7,7 +7,7 @@ from ..models import UserModel
 from ..models import FileModel
           
 class MessageModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     sender = db.ReferenceField(UserModel, required=True)
     receiver = db.ReferenceField(UserModel, required=True)
     title = db.StringField()

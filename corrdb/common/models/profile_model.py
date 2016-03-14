@@ -6,7 +6,7 @@ import json
 from bson import ObjectId
           
 class ProfileModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     user = db.ReferenceField(UserModel, reverse_delete_rule=db.CASCADE, required=True)
     fname = db.StringField(required=True)
     lname = db.StringField(required=True)

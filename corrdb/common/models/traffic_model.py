@@ -4,7 +4,7 @@ import json
 from bson import ObjectId
 
 class TrafficModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow(), required=True)
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     possible_service = ["api", "cloud", "web", "undefined"]
     service = db.StringField(default="undefined", choices=possible_service)
     endpoint = db.StringField()

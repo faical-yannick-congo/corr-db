@@ -4,7 +4,7 @@ import json
 from bson import ObjectId
           
 class BundleModel(db.Document):
-    created_at = db.DateTimeField(default=datetime.datetime.utcnow())
+    created_at = db.StringField(default=str(datetime.datetime.utcnow()))
     possible_scope = ["local", "remote", "unknown"]
     scope = db.StringField(default="unknown", choices=possible_scope)
     location = db.StringField()
